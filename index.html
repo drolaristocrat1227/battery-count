@@ -149,8 +149,23 @@
     text-align: center;
     font-size: 11px;
     color: #aaa;
-    margin: 10px 0 24px;
+    margin: 10px 0 0;
   }
+  .foot {
+    text-align: center;
+    margin: 18px 0 28px;
+  }
+  #updBtn {
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 18px;
+    height: 36px;
+    padding: 0 18px;
+    font-size: 14px;
+    color: #555;
+  }
+  #updBtn:disabled { opacity: .6; }
+  .ver { display: block; font-size: 11px; color: #aaa; margin-top: 6px; }
 
   /* 入力シート */
   .cover {
@@ -295,6 +310,11 @@
 
 <p class="note">1個 ¥165</p>
 
+<div class="foot">
+  <button id="updBtn">アプリを更新</button>
+  <span class="ver" id="ver"></span>
+</div>
+
 <div id="panel">
   <div class="cover" id="cover"></div>
   <div class="sheet">
@@ -324,6 +344,7 @@
 </div>
 
 <script>
+const VERSION = '1.2';
 const PRICE = 165;
 const KEY = 'battery-data';
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
@@ -491,9 +512,39 @@ document.querySelector('.cal').addEventListener('touchend', e => {
 
 render();
 
+// ---- 更新 ----
+
+$('ver').textContent = 'ver ' + VERSION;
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+
+$('updBtn').onclick = async () => {
+  const btn = $('updBtn');
+  if (!navigator.onLine) {
+    alert('通信できません。電波のある所でもう一度押してください。');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '更新中…';
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    }
+    // 画面のファイルだけ消す。入力した数字(localStorage)は残る
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    location.replace(location.pathname + '?v=' + Date.now());
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'アプリを更新';
+    alert('更新できませんでした。少し待ってからもう一度押してください。');
+  }
+};
 </script>
 </body>
 </html>

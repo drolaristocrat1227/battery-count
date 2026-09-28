@@ -3,7 +3,7 @@
  * ネットワーク優先、つながらないときはキャッシュから返す。
  * 入力データ（localStorage）には触らない。
  */
-const CACHE = 'battery-count-v1';
+const CACHE = 'battery-count-v2';
 
 const ASSETS = [
   './',
@@ -38,7 +38,7 @@ self.addEventListener('fetch', e => {
 
   e.respondWith((async () => {
     try {
-      const res = await fetch(req);
+      const res = await fetch(req, { cache: 'no-cache' });
       if (res && res.ok) {
         const c = await caches.open(CACHE);
         c.put(req, res.clone());
