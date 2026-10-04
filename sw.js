@@ -3,7 +3,7 @@
  * ネットワーク優先、つながらないときはキャッシュから返す。
  * 入力データ（localStorage）には触らない。
  */
-const CACHE = 'battery-count-v2';
+const CACHE = 'battery-count-v3';
 
 const ASSETS = [
   './',

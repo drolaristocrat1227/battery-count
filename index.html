@@ -303,7 +303,7 @@
 
 <div class="cal">
   <div class="head">
-    <div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div>
+    <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div>
   </div>
   <div id="weeks"></div>
 </div>
@@ -344,7 +344,7 @@
 </div>
 
 <script>
-const VERSION = '1.2';
+const VERSION = '1.3';
 const PRICE = 165;
 const KEY = 'battery-data';
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
@@ -373,7 +373,8 @@ function render() {
 
   const first = new Date(viewY, viewM, 1);
   const last = new Date(viewY, viewM + 1, 0);
-  const d = new Date(viewY, viewM, 1 - first.getDay());
+  // 月曜始まり
+  const d = new Date(viewY, viewM, 1 - (first.getDay() + 6) % 7);
   const todayKey = toKey(today);
   let html = '';
   let monthSum = 0;
@@ -388,8 +389,8 @@ function render() {
       if (d.getMonth() === viewM) monthSum += n;
 
       let cls = 'day';
-      if (i === 0) cls += ' sun';
-      if (i === 6) cls += ' sat';
+      if (i === 6) cls += ' sun';
+      if (i === 5) cls += ' sat';
       if (d.getMonth() !== viewM) cls += ' other';
       if (key === todayKey) cls += ' today';
       if (key === selKey) cls += ' sel';
