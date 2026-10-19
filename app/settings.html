@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>設定 - バッテリー集計</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", "Meiryo", sans-serif;
+    background: #f2f2f5;
+    color: #222;
+    touch-action: manipulation;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  button { font-family: inherit; color: inherit; }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    border-bottom: 1px solid #e3e3e8;
+    padding: env(safe-area-inset-top) 8px 0;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    height: 52px;
+    position: relative;
+  }
+  .bar h1 {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    margin: 0;
+  }
+  #back {
+    position: absolute;
+    left: 4px;
+    color: #e67e22;
+    text-decoration: none;
+    font-size: 16px;
+    padding: 10px 8px;
+  }
+
+  h2 {
+    font-size: 13px;
+    font-weight: normal;
+    color: #888;
+    margin: 20px 22px 6px;
+  }
+  .box {
+    background: #fff;
+    border-radius: 12px;
+    margin: 0 10px;
+    padding: 12px 14px;
+  }
+
+  .month {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .month button {
+    width: 44px;
+    height: 36px;
+    border: none;
+    background: none;
+    font-size: 24px;
+    color: #e67e22;
+  }
+  #ym { font-weight: bold; }
+
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 0 12px;
+    height: 52px;
+  }
+  .field span { font-size: 20px; color: #888; }
+  .field input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: right;
+    background: none;
+    font-family: inherit;
+  }
+  .field:focus-within { border-color: #e67e22; }
+  .sub {
+    font-size: 13px;
+    color: #888;
+    margin-top: 6px;
+    text-align: right;
+    min-height: 18px;
+  }
+
+  #copyBtn {
+    margin-top: 8px;
+    border: none;
+    background: none;
+    color: #e67e22;
+    font-size: 14px;
+    padding: 4px 0;
+  }
+
+  .app {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #ver { color: #888; font-size: 14px; }
+  #updBtn {
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 18px;
+    height: 36px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+  #updBtn:disabled { opacity: .6; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a id="back" href="index.html">‹ 戻る</a>
+    <h1>設定</h1>
+  </div>
+</header>
+
+<h2>月の目標金額</h2>
+<div class="box">
+  <div class="month">
+    <button id="prev">‹</button>
+    <span id="ym"></span>
+    <button id="next">›</button>
+  </div>
+  <label class="field">
+    <span>¥</span>
+    <input id="goal" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
+  </label>
+  <div class="sub" id="goalSub"></div>
+  <button id="copyBtn">前の月と同じにする</button>
+</div>
+
+<h2>1日の目標個数</h2>
+<div class="box">
+  <label class="field">
+    <input id="daily" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
+    <span>個</span>
+  </label>
+  <div class="sub" id="dailySub"></div>
+</div>
+
+<h2>アプリ</h2>
+<div class="box app">
+  <span id="ver"></span>
+  <button id="updBtn">アプリを更新</button>
+</div>
+
+<script>
+const VERSION = '1.4';
+const PRICE = 165;
+const GOAL_KEY = 'battery-goals';
+const DAILY_KEY = 'battery-daily';
+const CACHE_PREFIX = 'battery-count-';
+
+const $ = id => document.getElementById(id);
+function pad(n) { return String(n).padStart(2, '0'); }
+function num(s) { return parseInt(String(s).replace(/[^0-9]/g, ''), 10) || 0; }
+
+let goals = {};
+try { goals = JSON.parse(localStorage.getItem(GOAL_KEY)) || {}; } catch (e) {}
+
+// 開いていた月を引き継ぐ
+const now = new Date();
+let viewY = now.getFullYear();
+let viewM = now.getMonth();
+const qm = new URLSearchParams(location.search).get('m');
+if (/^\d{4}-\d{2}$/.test(qm || '')) {
+  viewY = +qm.slice(0, 4);
+  viewM = +qm.slice(5) - 1;
+}
+
+function monthKey(y, m) { return y + '-' + pad(m + 1); }
+
+function showGoal() {
+  const mk = monthKey(viewY, viewM);
+  $('ym').textContent = viewY + '年' + (viewM + 1) + '月';
+  $('back').href = 'index.html?m=' + mk;
+  const g = goals[mk] || 0;
+  $('goal').value = g ? g.toLocaleString() : '';
+  goalSub(g);
+
+  const py = viewM === 0 ? viewY - 1 : viewY;
+  const pm = viewM === 0 ? 11 : viewM - 1;
+  const prevGoal = goals[monthKey(py, pm)];
+  $('copyBtn').style.display = prevGoal && prevGoal !== g ? '' : 'none';
+  $('copyBtn').textContent = '前の月と同じにする（¥' + (prevGoal || 0).toLocaleString() + '）';
+}
+
+function goalSub(g) {
+  $('goalSub').textContent = g ? '＝ ' + Math.ceil(g / PRICE).toLocaleString() + '個' : '';
+}
+
+function saveGoal(g) {
+  const mk = monthKey(viewY, viewM);
+  if (g) goals[mk] = g;
+  else delete goals[mk];
+  localStorage.setItem(GOAL_KEY, JSON.stringify(goals));
+}
+
+$('goal').addEventListener('input', () => {
+  const g = num($('goal').value);
+  $('goal').value = g ? g.toLocaleString() : '';
+  saveGoal(g);
+  goalSub(g);
+});
+$('goal').addEventListener('blur', showGoal);
+
+$('copyBtn').onclick = () => {
+  const py = viewM === 0 ? viewY - 1 : viewY;
+  const pm = viewM === 0 ? 11 : viewM - 1;
+  saveGoal(goals[monthKey(py, pm)] || 0);
+  showGoal();
+};
+
+function moveMonth(diff) {
+  viewM += diff;
+  if (viewM < 0) { viewM = 11; viewY--; }
+  if (viewM > 11) { viewM = 0; viewY++; }
+  showGoal();
+}
+$('prev').onclick = () => moveMonth(-1);
+$('next').onclick = () => moveMonth(1);
+
+// 1日の目標
+function dailySub(d) {
+  $('dailySub').textContent = d ? '1日 ¥' + (d * PRICE).toLocaleString() : '';
+}
+const savedDaily = num(localStorage.getItem(DAILY_KEY));
+$('daily').value = savedDaily || '';
+dailySub(savedDaily);
+$('daily').addEventListener('input', () => {
+  const d = num($('daily').value);
+  $('daily').value = d || '';
+  if (d) localStorage.setItem(DAILY_KEY, d);
+  else localStorage.removeItem(DAILY_KEY);
+  dailySub(d);
+});
+
+showGoal();
+
+// ---- 更新 ----
+
+$('ver').textContent = 'ver ' + VERSION;
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+$('updBtn').onclick = async () => {
+  const btn = $('updBtn');
+  if (!navigator.onLine) {
+    alert('通信できません。電波のある所でもう一度押してください。');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '更新中…';
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    }
+    // このアプリの画面ファイルだけ消す。入力した数字(localStorage)は残る
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(k => k.startsWith(CACHE_PREFIX)).map(k => caches.delete(k)));
+    }
+    location.replace(location.pathname + '?v=' + Date.now());
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'アプリを更新';
+    alert('更新できませんでした。少し待ってからもう一度押してください。');
+  }
+};
+</script>
+</body>
+</html>

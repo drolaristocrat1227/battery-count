@@ -2,7 +2,7 @@
   "name": "バッテリー集計",
   "short_name": "バッテリー集計",
   "lang": "ja",
-  "id": "/battery-count",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
